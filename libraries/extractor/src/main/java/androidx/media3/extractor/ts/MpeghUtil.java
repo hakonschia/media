@@ -48,26 +48,27 @@ import java.lang.annotation.Target;
 
   /**
    * Parses an MHAS packet header. See ISO_IEC_23008-3;2022, 14.2.1, Table 222. The reading position
-   * of {@code data} will be modified.
+   * of {@code data} will be modified to be just after the end of the MHAS packet header.
    *
    * @param data The data to parse, positioned at the start of the MHAS packet header. Must be
    *     byte-aligned.
-   * @return The {@link MhasPacketHeader} info.
+   * @param header An instance of {@link MhasPacketHeader} that will be updated with the parsed
+   *     information.
    * @throws ParserException if a valid {@link MhasPacketHeader} cannot be parsed.
    */
-  public static MhasPacketHeader parseMhasPacketHeader(ParsableBitArray data)
+  public static void parseMhasPacketHeader(ParsableBitArray data, MhasPacketHeader header)
       throws ParserException {
     int dataStartPos = data.getBytePosition();
-    @MhasPacketHeader.Type int packetType = readEscapedIntValue(data, 3, 8, 8);
-    long packetLabel = readEscapedLongValue(data, 2, 8, 32);
+    header.packetType = readEscapedIntValue(data, 3, 8, 8);
+    header.packetLabel = readEscapedLongValue(data, 2, 8, 32);
 
-    if (packetLabel > 0x10) {
+    if (header.packetLabel > 0x10) {
       throw ParserException.createForUnsupportedContainerFeature(
-          "Contains sub-stream with an invalid packet label " + packetLabel);
+          "Contains sub-stream with an invalid packet label " + header.packetLabel);
     }
 
-    if (packetLabel == 0) {
-      switch (packetType) {
+    if (header.packetLabel == 0) {
+      switch (header.packetType) {
         case MhasPacketHeader.PACTYP_MPEGH3DACFG:
           throw ParserException.createForMalformedContainer(
               "Mpegh3daConfig packet with invalid packet label 0", /* cause= */ null);
@@ -82,11 +83,8 @@ import java.lang.annotation.Target;
       }
     }
 
-    int packetLength = readEscapedIntValue(data, 11, 24, 24);
-
-    int headerLength = data.getBytePosition() - dataStartPos;
-
-    return new MhasPacketHeader(packetType, packetLabel, packetLength, headerLength);
+    header.packetLength = readEscapedIntValue(data, 11, 24, 24);
+    header.headerLength = data.getBytePosition() - dataStartPos;
   }
 
   /**
@@ -304,7 +302,7 @@ import java.lang.annotation.Target;
   /**
    * Obtains the number of truncated samples of the AudioTruncationInfo from an MPEG-H bit stream.
    * See ISO_IEC_23008-3;2022, 14.2.2, Table 225. The reading position of {@code data} will be
-   * modified.
+   * modified to be just after the end of the AudioTruncation packet payload.
    *
    * @param data The data to parse, positioned at the start of the payload of an AudioTruncation
    *     packet.
@@ -554,6 +552,8 @@ import java.lang.annotation.Target;
   private static int readEscapedIntValue(ParsableBitArray data, int bits1, int bits2, int bits3) {
     // Check that a max possible escaped value doesn't exceed the max value that can be stored in an
     // Integer.
+    int maxBitCount = Math.max(bits1, Math.max(bits2, bits3));
+    checkArgument(maxBitCount < Integer.SIZE);
     checkArgument(Integer.MAX_VALUE - (1L << bits1) - (1L << bits2) - (1L << bits3) + 3 >= 0);
 
     int value = data.readBits(bits1);
@@ -589,6 +589,8 @@ import java.lang.annotation.Target;
   private static long readEscapedLongValue(ParsableBitArray data, int bits1, int bits2, int bits3) {
     // Check that a max possible escaped value doesn't exceed the max value that can be stored in a
     // Long.
+    int maxBitCount = Math.max(bits1, Math.max(bits2, bits3));
+    checkArgument(maxBitCount < Long.SIZE);
     checkArgument(Long.MAX_VALUE - (1L << bits1) - (1L << bits2) - (1L << bits3) + 3 >= 0);
 
     long value = data.readBitsToLong(bits1);
@@ -665,25 +667,16 @@ import java.lang.annotation.Target;
     public static final int PACTYP_LOUDNESS = 22;
 
     /** The payload type in the actual packet. */
-    public final @Type int packetType;
+    public @Type int packetType;
 
     /** A label indicating which packets belong together. */
-    public final long packetLabel;
+    public long packetLabel;
 
     /** The length of MHAS packet payload in bytes. */
-    public final int packetLength;
+    public int packetLength;
 
     /** The length of MHAS packet header in bytes. */
-    public final int headerLength;
-
-    /** Creates an instance. */
-    public MhasPacketHeader(
-        @Type int packetType, long packetLabel, int packetLength, int headerLength) {
-      this.packetType = packetType;
-      this.packetLabel = packetLabel;
-      this.packetLength = packetLength;
-      this.headerLength = headerLength;
-    }
+    public int headerLength;
   }
 
   /** Represents an MPEG-H 3D audio configuration. */
