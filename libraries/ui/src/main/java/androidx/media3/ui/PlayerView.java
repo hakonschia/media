@@ -517,6 +517,11 @@ public class PlayerView extends FrameLayout implements AdViewProvider {
     updateContentDescription();
   }
 
+  public void setScrubListener(TimeBar.OnScrubListener scrubListener) {
+    PlayerControlView customController = findViewById(R.id.exo_controller);
+    customController.setScrubListener(scrubListener);
+  }
+
   /**
    * Switches the view targeted by a given {@link Player}.
    *

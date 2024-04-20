@@ -85,6 +85,7 @@ import androidx.media3.common.util.Util;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.common.collect.ImmutableList;
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -334,6 +335,10 @@ public class PlayerControlView extends FrameLayout {
   @SuppressWarnings("deprecation") // Supporting deprecated listener
   @Nullable
   private OnFullScreenModeChangedListener onFullScreenModeChangedListener;
+
+  void setScrubListener(TimeBar.OnScrubListener listener) {
+    timeBar.addListener(listener);
+  }
 
   private boolean isFullScreen;
   private boolean isAttachedToWindow;

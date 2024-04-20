@@ -17,13 +17,16 @@ package androidx.media3.demo.main;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,27 +44,32 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
 import androidx.media3.exoplayer.ima.ImaAdsLoader;
 import androidx.media3.exoplayer.ima.ImaServerSideAdInsertionMediaSource;
+import androidx.media3.exoplayer.image.ImageOutput;
 import androidx.media3.exoplayer.mediacodec.MediaCodecRenderer.DecoderInitializationException;
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil.DecoderQueryException;
 import androidx.media3.exoplayer.offline.DownloadRequest;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ads.AdsLoader;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.exoplayer.util.DebugTextViewHelper;
 import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.ui.PlayerView;
+import androidx.media3.ui.TimeBar;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** An activity that plays media using {@link ExoPlayer}. */
+@UnstableApi
 public class PlayerActivity extends AppCompatActivity
     implements OnClickListener, PlayerView.ControllerVisibilityListener {
 
@@ -74,9 +82,11 @@ public class PlayerActivity extends AppCompatActivity
   private static final String KEY_AUTO_PLAY = "auto_play";
 
   protected PlayerView playerView;
+  protected ImageView thumbnailView;
   protected LinearLayout debugRootView;
   protected TextView debugTextView;
   protected @Nullable ExoPlayer player;
+  protected @Nullable ExoPlayer thumbnailsPlayer;
 
   private boolean isShowingTrackSelectionDialog;
   private Button selectTracksButton;
@@ -115,6 +125,38 @@ public class PlayerActivity extends AppCompatActivity
     playerView.setControllerVisibilityListener(this);
     playerView.setErrorMessageProvider(new PlayerErrorMessageProvider());
     playerView.requestFocus();
+
+    playerView.setScrubListener(
+        new TimeBar.OnScrubListener() {
+          @Override
+          public void onScrubStart(TimeBar timeBar, long position) {
+            if (thumbnailsPlayer != null) {
+              thumbnailsPlayer.seekTo(position);
+            }
+          }
+
+          private long lastSeek = 0L;
+
+          @Override
+          public void onScrubMove(TimeBar timeBar, long position) {
+            if (thumbnailsPlayer != null) {
+              long now = System.currentTimeMillis();
+              if (now > lastSeek + 75) {
+                thumbnailsPlayer.seekTo(position);
+                lastSeek = now;
+              }
+            }
+          }
+
+          @Override
+          public void onScrubStop(TimeBar timeBar, long position, boolean canceled) {
+            if (thumbnailsPlayer != null) {
+              thumbnailsPlayer.seekTo(position);
+            }
+          }
+        });
+
+    thumbnailView = findViewById(R.id.thumbnail_view);
 
     if (savedInstanceState != null) {
       trackSelectionParameters =
@@ -284,16 +326,54 @@ public class PlayerActivity extends AppCompatActivity
       debugViewHelper = new DebugTextViewHelper(player, debugTextView);
       debugViewHelper.start();
     }
+
+    if (thumbnailsPlayer == null) {
+      thumbnailsPlayer =
+          new ExoPlayer.Builder(this)
+              .setTrackSelector(
+                  new DefaultTrackSelector(
+                      this,
+                      new TrackSelectionParameters.Builder(this)
+                          .setPrioritizeImageOverVideoEnabled(true)
+                          .build()))
+              .setLoadControl(
+                  new DefaultLoadControl.Builder()
+                      .setBackBuffer(
+                          /* backBufferDurationMs= */ 200_000,
+                          /* retainBackBufferFromKeyframe= */ true)
+                      .setBufferDurationsMs(
+                          /* minBufferMs= */ 5_000,
+                          /* maxBufferMs= */ 200_000,
+                          /* bufferForPlaybackMs= */ 5_000,
+                          /* bufferForPlaybackAfterRebufferMs= */ 5_000)
+                      .build())
+              .build();
+    }
+
     boolean haveStartPosition = startItemIndex != C.INDEX_UNSET;
     if (haveStartPosition) {
       player.seekTo(startItemIndex, startPosition);
     }
     player.setMediaItems(mediaItems, /* resetPosition= */ !haveStartPosition);
     player.prepare();
-    String repeatModeExtra = intent.getStringExtra(IntentUtil.REPEAT_MODE_EXTRA);
-    if (repeatModeExtra != null) {
-      player.setRepeatMode(IntentUtil.parseRepeatModeExtra(repeatModeExtra));
-    }
+
+    thumbnailsPlayer.setMediaItems(mediaItems, /* resetPosition= */ !haveStartPosition);
+    thumbnailsPlayer.prepare();
+    thumbnailsPlayer.setImageOutput(
+        new ImageOutput() {
+          @Override
+          public void onImageAvailable(long presentationTimeUs, Bitmap bitmap) {
+            Log.d("onImageAvailable", String.format("%d", presentationTimeUs));
+            runOnUiThread(
+                () -> {
+                  thumbnailView.setImageBitmap(bitmap);
+                });
+          }
+
+          @Override
+          public void onDisabled() {}
+        });
+
     updateButtonVisibility();
     return true;
   }
@@ -391,6 +471,10 @@ public class PlayerActivity extends AppCompatActivity
       player = null;
       playerView.setPlayer(/* player= */ null);
       mediaItems = Collections.emptyList();
+    }
+    if (thumbnailsPlayer != null) {
+      thumbnailsPlayer.release();
+      thumbnailsPlayer = null;
     }
     if (clientSideAdsLoader != null) {
       clientSideAdsLoader.setPlayer(null);
