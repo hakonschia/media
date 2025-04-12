@@ -36,6 +36,7 @@ import androidx.media3.common.ErrorMessageProvider;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
@@ -500,6 +501,24 @@ public class PlayerActivity extends AppCompatActivity
           && !tracks.isTypeSupported(C.TRACK_TYPE_AUDIO, /* allowExceedsCapabilities= */ true)) {
         showToast(R.string.error_unsupported_audio);
       }
+
+      tracks.getGroups().forEach((group) -> {
+            for (int i = 0; i < group.length; i++) {
+              String[] characteristics = group.getTrackFormat(i).characteristics;
+
+              for (int j = 0; j < characteristics.length; j++) {
+                if (characteristics[j].equals("private.uti.example")) {
+                  player.getTrackSelector().setParameters(
+                      player.getTrackSelectionParameters().buildUpon()
+                          .setOverrideForType(new TrackSelectionOverride(group.getMediaTrackGroup(), i))
+                          .build()
+                  );
+                }
+              }
+            }
+          }
+      );
+
       lastSeenTracks = tracks;
     }
   }

@@ -155,6 +155,7 @@ public final class Format {
     @Nullable private String codecs;
     @Nullable private Metadata metadata;
     @Nullable private Object customData;
+    private String[] characteristics;
 
     // Container specific.
 
@@ -207,6 +208,7 @@ public final class Format {
     /** Creates a new instance with default values. */
     public Builder() {
       labels = ImmutableList.of();
+      characteristics = new String[]{};
       averageBitrate = NO_VALUE;
       peakBitrate = NO_VALUE;
       // Sample specific.
@@ -252,6 +254,7 @@ public final class Format {
       this.codecs = format.codecs;
       this.metadata = format.metadata;
       this.customData = format.customData;
+      this.characteristics = format.characteristics;
       // Container specific.
       this.containerMimeType = format.containerMimeType;
       // Sample specific.
@@ -459,6 +462,12 @@ public final class Format {
     @CanIgnoreReturnValue
     public Builder setCustomData(@Nullable Object customData) {
       this.customData = customData;
+      return this;
+    }
+
+    @CanIgnoreReturnValue
+    public Builder setCharacteristics(String[] characteristics) {
+      this.characteristics = characteristics;
       return this;
     }
 
@@ -945,6 +954,8 @@ public final class Format {
    */
   @UnstableApi @Nullable public final Object customData;
 
+  public final String[] characteristics;
+
   // Container specific.
 
   /** The MIME type of the container, or null if unknown or not applicable. */
@@ -1131,6 +1142,7 @@ public final class Format {
     codecs = builder.codecs;
     metadata = builder.metadata;
     customData = builder.customData;
+    characteristics = builder.characteristics;
     // Container specific.
     containerMimeType = builder.containerMimeType;
     // Sample specific.

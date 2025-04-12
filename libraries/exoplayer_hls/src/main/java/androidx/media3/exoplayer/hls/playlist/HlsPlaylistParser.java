@@ -557,6 +557,7 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
               .setContainerMimeType(MimeTypes.APPLICATION_M3U8)
               .setSelectionFlags(parseSelectionFlags(line))
               .setRoleFlags(parseRoleFlags(line, variableDefinitions))
+              .setCharacteristics(parseCharacteristics(line, variableDefinitions))
               .setLanguage(parseOptionalStringAttr(line, REGEX_LANGUAGE, variableDefinitions));
 
       @Nullable String referenceUri = parseOptionalStringAttr(line, REGEX_URI, variableDefinitions);
@@ -1322,14 +1323,19 @@ public final class HlsPlaylistParser implements ParsingLoadable.Parser<HlsPlayli
     return flags;
   }
 
-  private static @C.RoleFlags int parseRoleFlags(
+  private static String[] parseCharacteristics(
       String line, Map<String, String> variableDefinitions) {
     String concatenatedCharacteristics =
         parseOptionalStringAttr(line, REGEX_CHARACTERISTICS, variableDefinitions);
     if (TextUtils.isEmpty(concatenatedCharacteristics)) {
-      return 0;
+      return new String[]{};
     }
-    String[] characteristics = Util.split(concatenatedCharacteristics, ",");
+    return Util.split(concatenatedCharacteristics, ",");
+  }
+
+  private static @C.RoleFlags int parseRoleFlags(
+      String line, Map<String, String> variableDefinitions) {
+    String[] characteristics = parseCharacteristics(line, variableDefinitions);
     @C.RoleFlags int roleFlags = 0;
     if (Util.contains(characteristics, "public.accessibility.describes-video")) {
       roleFlags |= C.ROLE_FLAG_DESCRIBES_VIDEO;

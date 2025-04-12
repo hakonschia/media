@@ -235,6 +235,10 @@
     "name": "HLS",
     "samples": [
       {
+        "name": "Private UTI",
+        "uri": "https://gist.githubusercontent.com/hakonschia/f97c9c40224409ef8b8ecf014c865e80/raw/83ec260b2459ee822f08e4e4839dc40aeb77d2f2/privateuti.m3u8"
+      },
+      {
         "name": "Apple 4x3 basic stream (TS)",
         "uri": "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
       },
